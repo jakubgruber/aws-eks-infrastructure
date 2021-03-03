@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-   name: management
+   name: pmo-core
 ---
 apiVersion: v1
 kind: ResourceQuota
 metadata:
    name: mem-cpu-demo
-   namespace: management
+   namespace: pmo-core
 spec:
    hard:
       requests.cpu: "1"
@@ -19,7 +19,7 @@ apiVersion: v1
 kind: ResourceQuota
 metadata:
    name: storage-ns1
-   namespace: management
+   namespace: pmo-core
 spec:
    hard:
       storagens2.storageclass.storage.k8s.io/requests.storage: 0

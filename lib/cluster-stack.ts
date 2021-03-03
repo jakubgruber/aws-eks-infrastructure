@@ -7,46 +7,29 @@ import {PhysicalName} from '@aws-cdk/core';
 export class ClusterStack extends cdk.Stack {
 
     public readonly cluster: eks.Cluster;
-    public readonly firstRegionRole: iam.Role;
-    public readonly secondRegionRole: iam.Role;
+    public readonly regionRole: iam.Role;
 
     constructor(scope: cdk.Construct, id: string, props?: cdk.StackProps) {
         super(scope, id, props);
-
-        const primaryRegion = 'ap-northeast-2';
 
         const clusterAdmin = new iam.Role(this, 'AdminRole', {
             assumedBy: new iam.AccountRootPrincipal()
         });
 
-        // TODO:
-        // new eks.FargateCluster(this, 'HelloEKS', {
-        //     version: eks.KubernetesVersion.V1_18,
-        //     clusterName: `demogo`,
-        //     mastersRole: clusterAdmin,
-        //     //defaultProfile: {}
-        // });
-
-        const cluster = new eks.Cluster(this, 'demogo-cluster', {
-            clusterName: `demogo`,
+        const cluster = new eks.Cluster(this, 'pmo-core-cluster', {
+            clusterName: `pmo-core`,
             mastersRole: clusterAdmin,
             version: eks.KubernetesVersion.V1_18,
             defaultCapacity: 2,
-            defaultCapacityInstance: cdk.Stack.of(this).region == primaryRegion ?
-                new ec2.InstanceType('r5.xlarge') : new ec2.InstanceType('m5.2xlarge')
+            defaultCapacityInstance: new ec2.InstanceType('r5.large')
         });
 
         cluster.addAutoScalingGroupCapacity('spot-group', {
-            instanceType: new ec2.InstanceType('m5.xlarge'),
-            spotPrice: cdk.Stack.of(this).region == primaryRegion ? '0.248' : '0.192'
+            instanceType: new ec2.InstanceType('r5.large'),
+            spotPrice: '0.2'
         });
 
-        if (cdk.Stack.of(this).region == primaryRegion) {
-            this.firstRegionRole = createDeployRole(this, `for-1st-region`, cluster);
-        } else {
-            this.secondRegionRole = createDeployRole(this, `for-2nd-region`, cluster);
-        }
-
+        this.regionRole = createDeployRole(this, `region-deploy-role`, cluster);
         this.cluster = cluster;
     }
 }
@@ -59,16 +42,4 @@ function createDeployRole(scope: cdk.Construct, id: string, cluster: eks.Cluster
     cluster.awsAuth.addMastersRole(role);
 
     return role;
-}
-
-
-export interface EksProps extends cdk.StackProps {
-    cluster: eks.Cluster
-}
-
-export interface CicdProps extends cdk.StackProps {
-    firstRegionCluster: eks.Cluster,
-    secondRegionCluster: eks.Cluster,
-    firstRegionRole: iam.Role,
-    secondRegionRole: iam.Role
 }

@@ -3,34 +3,43 @@ import codecommit = require('@aws-cdk/aws-codecommit');
 import ecr = require('@aws-cdk/aws-ecr');
 import codepipeline = require('@aws-cdk/aws-codepipeline');
 import pipelineAction = require('@aws-cdk/aws-codepipeline-actions');
-import {codeToECRspec, deployToEKSspec} from '../utils/buildspecs';
-import {CicdProps} from './cluster-stack';
+import * as buildspec from '../utils/buildspecs';
+import {deployToEKSspec} from "../utils/buildimage/deployspecs";
+import * as eks from "@aws-cdk/aws-eks";
+import * as iam from "@aws-cdk/aws-iam";
+import {BuildSpecType} from "../utils/buildspecs";
 
+export interface CicdProps extends cdk.StackProps {
+    regionCluster: eks.Cluster,
+    regionRole: iam.Role,
+    gitRepositoryName: string,
+    ecrRepositoryName: string,
+    deploymentRegion: string,
+    buildType: BuildSpecType,
+}
 
 export class CicdStack extends cdk.Stack {
 
     constructor(scope: cdk.Construct, id: string, props: CicdProps) {
         super(scope, id, props);
 
-        const primaryRegion = 'ap-northeast-2';
-        const secondaryRegion = 'us-west-2';
-
-        const helloPyRepo = new codecommit.Repository(this, 'hello-py-for-demogo', {
-            repositoryName: `hello-py-${cdk.Stack.of(this).region}`
+        const codeCommitRepository = new codecommit.Repository(this, props.gitRepositoryName, {
+            repositoryName: `${props.gitRepositoryName}-${cdk.Stack.of(this).region}`
         });
 
         new cdk.CfnOutput(this, `codecommit-uri`, {
-            exportName: 'CodeCommitURL',
-            value: helloPyRepo.repositoryCloneUrlHttp
+            exportName: `CodeCommitURL-${props.gitRepositoryName}`,
+            value: codeCommitRepository.repositoryCloneUrlSsh
         });
 
-        const ecrForMainRegion = new ecr.Repository(this, `ecr-for-hello-py`);
+        const ecrRepository = new ecr.Repository(this, props.ecrRepositoryName, {
+            repositoryName: `${props.ecrRepositoryName}-${cdk.Stack.of(this).region}`
+        });
 
-        const buildForECR = codeToECRspec(this, ecrForMainRegion.repositoryUri);
-        ecrForMainRegion.grantPullPush(buildForECR.role!);
+        const buildSpecFunc = buildspec.getBuildSpecFunc(props.buildType)
+        const ecrBuild = buildSpecFunc(this, ecrRepository.repositoryUri);
 
-        const deployToMainCluster = deployToEKSspec(this, primaryRegion, props.firstRegionCluster, ecrForMainRegion, props.firstRegionRole);
-        const deployTo2ndCluster = deployToEKSspec(this, secondaryRegion, props.secondRegionCluster, ecrForMainRegion, props.secondRegionRole);
+        ecrRepository.grantPullPush(ecrBuild.role!);
 
         const sourceOutput = new codepipeline.Artifact();
 
@@ -38,37 +47,25 @@ export class CicdStack extends cdk.Stack {
             stages: [{
                 stageName: 'Source',
                 actions: [new pipelineAction.CodeCommitSourceAction({
-                    actionName: 'CatchSourcefromCode',
-                    repository: helloPyRepo,
+                    actionName: 'CatchSourceFromCode',
+                    repository: codeCommitRepository,
                     output: sourceOutput,
                 })]
             }, {
                 stageName: 'Build',
                 actions: [new pipelineAction.CodeBuildAction({
-                    actionName: 'BuildAndPushtoECR',
+                    actionName: 'BuildAndPushToECR',
                     input: sourceOutput,
-                    project: buildForECR
+                    project: ecrBuild
                 })]
             }, {
-                stageName: 'DeployToMainEKScluster',
+                stageName: 'DeployToMainEKSCluster',
                 actions: [new pipelineAction.CodeBuildAction({
-                    actionName: 'DeployToMainEKScluster',
+                    actionName: 'DeployToMainEKSCluster',
                     input: sourceOutput,
-                    project: deployToMainCluster
-                })]
-            }, {
-                stageName: 'ApproveToDeployTo2ndRegion',
-                actions: [new pipelineAction.ManualApprovalAction({
-                    actionName: 'ApproveToDeployTo2ndRegion'
-                })]
-            }, {
-                stageName: 'DeployTo2ndRegionCluster',
-                actions: [new pipelineAction.CodeBuildAction({
-                    actionName: 'DeployTo2ndRegionCluster',
-                    input: sourceOutput,
-                    project: deployTo2ndCluster
-                })]
-            }
+                    project: deployToEKSspec(this, props.deploymentRegion, props.regionCluster, ecrRepository, props.regionRole),
+                }),]
+            },
             ]
         });
 

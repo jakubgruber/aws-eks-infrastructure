@@ -1,6 +1,10 @@
 import * as cdk from '@aws-cdk/core';
 import {readYamlFromDir} from '../utils/read-file';
-import {EksProps} from './cluster-stack';
+import * as eks from "@aws-cdk/aws-eks";
+
+export interface EksProps extends cdk.StackProps {
+    cluster: eks.Cluster
+}
 
 export class ContainerStack extends cdk.Stack {
 
@@ -16,5 +20,3 @@ export class ContainerStack extends cdk.Stack {
     }
 
 }
-
-

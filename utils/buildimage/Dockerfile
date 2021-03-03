@@ -12,7 +12,9 @@ RUN \
 	rm /var/cache/apk/* && \
 	adduser kubectl -Du 5566
 
-ADD https://amazon-eks.s3-us-west-2.amazonaws.com/1.14.6/2019-08-22/bin/linux/amd64/kubectl /usr/local/bin/kubectl
+# curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+
+ADD https://dl.k8s.io/release/v1.20.4/bin/linux/amd64/kubectl /usr/local/bin/kubectl
 
 WORKDIR $HOME
 
