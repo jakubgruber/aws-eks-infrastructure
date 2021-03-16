@@ -50,3 +50,9 @@ kubectl get all -n ingress-nginx
 
 kubectl get service ingress-nginx-controller
 ```
+
+# AppMesh
+
+- ClusterConfig
+    - allow addonPolicies:
+        - xRay: true

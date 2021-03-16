@@ -17,6 +17,13 @@ export class ContainerStack extends cdk.Stack {
 
         readYamlFromDir(commonFolder, cluster);
         readYamlFromDir(regionFolder, cluster);
+
+        cluster.addHelmChart(`AppMeshController`, {
+            repository: 'https://aws.github.io/eks-charts',
+            chart: 'appmesh-controller',
+            release: 'appmesh-controller',
+            namespace: 'pmo-core',
+        });
     }
 
 }

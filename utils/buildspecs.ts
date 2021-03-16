@@ -72,7 +72,8 @@ function jibBuildToECR(scope: cdk.Construct, ecrRepo: string): PipelineProject {
             phases: {
                 pre_build: {
                     commands: [
-                        'env', `$(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)`,
+                        'env',
+                        `$(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)`,
                         'IMAGE_TAG=$CODEBUILD_RESOLVED_SOURCE_VERSION',
                         'chmod +x ./gradlew'
                     ]
